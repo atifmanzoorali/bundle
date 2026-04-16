@@ -40,8 +40,7 @@ function handleToolAction(tool, card) {
   if (tool === 'screenshot') {
     startAreaSelection(card);
   } else if (tool === 'fullpage') {
-    setButtonLoading(card, 'Capturing...');
-    setTimeout(() => resetButton(card), 1000);
+    startFullPageCapture(card);
   } else if (tool === 'colorpicker') {
     startColorPicker(card);
   }
@@ -79,17 +78,18 @@ function startAreaSelection(card) {
         }
       }
 
-      // Small delay to ensure script is ready before sending message
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      try {
-        await chrome.tabs.sendMessage(tab.id, { action: 'INIT_SELECTION', tabId: tab.id }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('Failed to send INIT_SELECTION:', chrome.runtime.lastError.message);
+      // Retry logic for message sending
+      let connected = false;
+      for (let retry = 0; retry < 3 && !connected; retry++) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await chrome.tabs.sendMessage(tab.id, { action: 'INIT_SELECTION', tabId: tab.id });
+          connected = true;
+        } catch (e) {
+          if (retry < 2) {
+            await new Promise(resolve => setTimeout(resolve, 200));
           }
-        });
-      } catch (e) {
-        console.error('Error sending INIT_SELECTION:', e.message);
+        }
       }
 
       window.close();
@@ -125,6 +125,41 @@ function startColorPicker(card) {
       resetButton(card);
     }
   })();
+}
+
+async function startFullPageCapture(card) {
+  setButtonLoading(card, 'Capturing...');
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      resetButton(card);
+      return;
+    }
+
+    // Inject fullpage.js
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['fullpage.js']
+    }).catch(e => {
+      if (!e.message.includes('already injected')) {
+        console.warn('Fullpage script injection:', e.message);
+      }
+    });
+
+    // Small delay for script to load
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Trigger capture
+    await chrome.tabs.sendMessage(tab.id, {
+      action: 'START_FULL_PAGE_CAPTURE'
+    });
+
+    window.close();
+  } catch (error) {
+    console.error('Full page capture failed:', error);
+    resetButton(card);
+  }
 }
 
 function setButtonLoading(card, text) {

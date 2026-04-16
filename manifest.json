@@ -24,7 +24,8 @@
     "scripting",
     "storage",
     "downloads",
-    "alarms"
+    "alarms",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -37,7 +38,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["selection.js", "selection.css"],
+      "resources": ["selection.js", "selection.css", "offscreen.html", "offscreen.js"],
       "matches": ["<all_urls>"]
     }
   ],

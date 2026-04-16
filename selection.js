@@ -17,10 +17,10 @@
     return new Promise((resolve) => {
       try {
         backgroundPort = chrome.runtime.connect({ name: 'selection-port' });
-        
+
         backgroundPort.onMessage.addListener((message) => {
           console.log('Received from background:', message);
-          
+
           if (message.action === 'CAPTURE_SELECTION_RESPONSE') {
             handleCaptureResponse(message.response);
           }
@@ -32,18 +32,9 @@
           portReady = false;
         });
 
-        backgroundPort.onConnect.addListener(() => {
-          console.log('Port connected to background');
-          portReady = true;
-          resolve(true);
-        });
-
-        setTimeout(() => {
-          if (!portReady) {
-            console.log('Port connection timeout');
-            resolve(false);
-          }
-        }, 2000);
+        // Port is ready immediately on successful connect()
+        portReady = true;
+        resolve(true);
 
       } catch (e) {
         console.error('Failed to connect to background:', e.message);
