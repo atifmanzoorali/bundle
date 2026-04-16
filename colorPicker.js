@@ -1,25 +1,5 @@
-(async function() {
-  if (!window.EyeDropper) {
-    showNotification('Browser not supported', '#EF4444');
-    return;
-  }
-
-  const eyeDropper = new EyeDropper();
-  
-  try {
-    const result = await eyeDropper.open();
-    const hexCode = result.sRGBHex;
-    
-    showNotification(hexCode, hexCode);
-    
-    chrome.runtime.sendMessage({ action: 'COLOR_PICKED', value: hexCode });
-  } catch (e) {
-    if (e.name !== 'AbortError') {
-      console.error('Color picker error:', e.message);
-    }
-  }
-
-  function showNotification(hexCode, bgColor) {
+(function() {
+  function showNotification(hexCode) {
     const notification = document.createElement('div');
     notification.id = 'bundle-color-notification';
     notification.innerHTML = `
@@ -51,6 +31,7 @@
     });
 
     const style = document.createElement('style');
+    style.id = 'bundle-color-style';
     style.textContent = `
       #bundle-color-notification {
         position: fixed;
@@ -136,4 +117,55 @@
       }
     }, 5000);
   }
+
+  function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.id = 'bundle-color-error';
+    errorDiv.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2147483647;
+      padding: 12px 16px;
+      background: #EF4444;
+      color: white;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+    `;
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.remove();
+      }
+    }, 3000);
+  }
+
+  async function pickColor() {
+    const EyeDropper = window.EyeDropper;
+    
+    if (!EyeDropper) {
+      showError('EyeDropper not supported');
+      return;
+    }
+
+    const eyeDropper = new EyeDropper();
+    
+    try {
+      const result = await eyeDropper.open();
+      const hexCode = result.sRGBHex;
+      showNotification(hexCode);
+      chrome.runtime.sendMessage({ action: 'COLOR_PICKED', value: hexCode });
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        console.error('Color picker error:', e);
+        showError('Color pick failed');
+      }
+    }
+  }
+
+  pickColor();
 })();
