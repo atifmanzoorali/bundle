@@ -118,6 +118,7 @@ function startColorPicker(card) {
         world: 'MAIN'
       });
 
+      await new Promise(resolve => setTimeout(resolve, 100));
       window.close();
     } catch (error) {
       console.error('Failed to start color picker:', error);
