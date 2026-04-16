@@ -26,12 +26,13 @@ Capture an entire webpage including all scrollable content.
 **Output:** PNG or JPEG image saved as `full-page-TIMESTAMP.png/.jpg`
 
 **Technical features:**
-- Automatic scrolling with 500ms delay between captures (prevents throttling)
+- Automatic scrolling with 600ms delay before capture + 100ms after (prevents throttling)
 - Fixed/sticky elements are temporarily hidden during capture
 - JPEG format (0.8 quality) used automatically for pages >10,000px height
 - Maximum height limit: 16,000px (alerts user if exceeded)
 - Clean capture: overlay UI is hidden before any screenshots are taken
 - Uses Offscreen Document for reliable image stitching
+- Bulletproof error handling with try/catch and proper async responses
 
 ### 3. Color Picker
 Pick any color from the page and copy its HEX value to clipboard.
@@ -153,8 +154,9 @@ The extension requires the following permissions:
 ## Technical Details
 
 ### Throttling Prevention
-- 500ms delay between viewport captures
-- Prevents `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND` error
+- 600ms delay before each viewport capture
+- 100ms delay after each capture
+- Total ~700ms per chunk prevents `MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND` error
 
 ### Memory Management
 - Images processed sequentially (no accumulation)
@@ -175,6 +177,13 @@ The extension requires the following permissions:
 - Keep-alive alarm every 0.5 minutes
 - Port connections maintain worker during captures
 - Offscreen Document used for heavy canvas operations
+
+### Error Handling & Robustness
+- All message listeners return `true` for async responses
+- Chrome API guards prevent errors on invalid contexts
+- Try/catch around download operations
+- Graceful failure handling with detailed console logging
+- Offscreen Document closed properly after stitching
 
 ## Troubleshooting
 

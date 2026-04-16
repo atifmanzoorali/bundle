@@ -134,39 +134,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'STITCH_DONE') {
     console.log('[Background] Download started:', request.filename, 'ID:', request.downloadId);
-    return;
+    return true;
   }
 
   if (request.action === 'STITCH_MEMORY_ERROR') {
     console.error('[Background] Memory error:', request.error);
-    return;
+    return true;
   }
 
   if (request.action === 'DOWNLOAD_BLOB') {
     console.log('[Background] Downloading blob:', request.filename);
-    console.log('[Background] Blob URL:', request.url);
 
-    chrome.downloads.download({
-      url: request.url,
-      filename: request.filename,
-      saveAs: true
-    }, (id) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Background] DOWNLOAD ERROR:', chrome.runtime.lastError.message);
-      } else {
-        console.log('[Background] Download started, ID:', id);
-      }
+    try {
+      chrome.downloads.download({
+        url: request.url,
+        filename: request.filename,
+        saveAs: true
+      }, (id) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] DOWNLOAD ERROR:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[Background] Download started, ID:', id);
+        }
 
-      // Close offscreen document after short delay
-      setTimeout(() => {
-        console.log('[Background] Closing offscreen document');
-        chrome.offscreen.closeDocument().catch(() => {
-          // Ignore errors if already closed
-        });
-      }, 1000);
-    });
+        // Close offscreen document after short delay
+        setTimeout(() => {
+          console.log('[Background] Closing offscreen document');
+          chrome.offscreen.closeDocument().catch(() => {
+            // Ignore errors if already closed
+          });
+        }, 1000);
+      });
+    } catch (error) {
+      console.error('[Background] Download system error:', error);
+    }
 
-    return;
+    return true;
   }
 });
 

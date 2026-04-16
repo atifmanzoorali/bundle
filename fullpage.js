@@ -2,7 +2,7 @@
   'use strict';
 
   const MAX_HEIGHT = 16000;
-  const WAIT_TIME = 500;
+  const WAIT_TIME = 600;
   let backgroundPort = null;
   let isCapturing = false;
 
@@ -98,6 +98,9 @@
         } catch (e) {
           console.error('[Fullpage] Failed to capture chunk', i, e);
         }
+
+        // Additional delay after capture to prevent throttling
+        await sleep(100);
       }
 
       if (chunks.length > 0) {
@@ -205,20 +208,22 @@
     });
   }
 
-  chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    if (request.action === 'START_FULL_PAGE_CAPTURE') {
-      console.log('[Fullpage] Received START_FULL_PAGE_CAPTURE');
-      startFullPageCapture()
-        .then(function() {
-          sendResponse({ success: true });
-        })
-        .catch(function(error) {
-          console.error('[Fullpage] Error:', error);
-          sendResponse({ success: false, error: error.message });
-        });
-      return true;
-    }
-  });
+  if (chrome && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+      if (request.action === 'START_FULL_PAGE_CAPTURE') {
+        console.log('[Fullpage] Received START_FULL_PAGE_CAPTURE');
+        startFullPageCapture()
+          .then(function() {
+            sendResponse({ success: true });
+          })
+          .catch(function(error) {
+            console.error('[Fullpage] Error:', error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true;
+      }
+    });
+  }
 
   console.log('[Fullpage] Script loaded and ready');
 })();
