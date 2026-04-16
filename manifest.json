@@ -29,7 +29,12 @@
   "host_permissions": [
     "<all_urls>"
   ],
-  "content_scripts": [],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
   "web_accessible_resources": [
     {
       "resources": ["selection.js", "selection.css"],

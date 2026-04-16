@@ -8,6 +8,14 @@ let selection = null;
 let captureBar = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'OPEN_PICKER') {
+    console.log("Picker triggered");
+    setTimeout(() => {
+      openColorPicker();
+    }, 100);
+    return { success: true };
+  }
+  
   if (request.action === 'startSelection') {
     initSelection();
     return { success: true };
@@ -311,4 +319,55 @@ function onKeyDown(e) {
   if (e.key === 'Escape') {
     cleanup();
   }
+}
+
+function openColorPicker() {
+  if (!window.EyeDropper) {
+    showColorError('EyeDropper not supported');
+    return;
+  }
+  
+  const picker = new EyeDropper();
+  picker.open().then(result => {
+    const hex = result.sRGBHex;
+    showColorNotification(hex);
+    chrome.runtime.sendMessage({ action: 'COLOR_PICKED', value: hex });
+  }).catch(e => {
+    if (e.name !== 'AbortError') {
+      console.error('Color picker error:', e);
+    }
+  });
+}
+
+function showColorNotification(hex) {
+  const notif = document.createElement('div');
+  notif.id = 'bundle-color-notification';
+  notif.innerHTML = `
+    <div style="position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#1A1A1A;border:1px solid #2A2A2A;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(16,185,129,0.15);border-radius:6px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span class="bundle-color-hex" style="font-size:14px;font-weight:600;color:#FFF;cursor:pointer;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.1);">${hex}</span>
+        <span class="bundle-color-label" style="font-size:11px;color:#A0A0A0;">Click to copy</span>
+      </div>
+    </div>
+  `;
+  notif.querySelector('.bundle-color-hex').onclick = () => {
+    navigator.clipboard.writeText(hex);
+    notif.querySelector('.bundle-color-label').textContent = 'Copied!';
+    notif.querySelector('.bundle-color-label').style.color = '#10B981';
+  };
+  document.body.appendChild(notif);
+  setTimeout(() => notif.remove(), 5000);
+}
+
+function showColorError(msg) {
+  const err = document.createElement('div');
+  err.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;padding:12px 16px;background:#EF4444;color:white;border-radius:8px;font-family:sans-serif;font-size:13px;';
+  err.textContent = msg;
+  document.body.appendChild(err);
+  setTimeout(() => err.remove(), 3000);
 }
