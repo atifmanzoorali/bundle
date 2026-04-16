@@ -53,7 +53,6 @@ function startAreaSelection(card) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) {
-        console.error('No active tab found');
         resetButton(card);
         return;
       }
@@ -62,9 +61,7 @@ function startAreaSelection(card) {
         target: { tabId: tab.id },
         files: ['selection.css']
       }).catch(e => {
-        if (!e.message.includes('already injected')) {
-          console.warn('CSS injection warning:', e.message);
-        }
+        if (!e.message.includes('already injected')) {}
       });
 
       try {
@@ -73,12 +70,9 @@ function startAreaSelection(card) {
           files: ['selection.js']
         });
       } catch (e) {
-        if (!e.message.includes('already injected')) {
-          console.warn('Script injection warning:', e.message);
-        }
+        if (!e.message.includes('already injected')) {}
       }
 
-      // Retry logic for message sending
       let connected = false;
       for (let retry = 0; retry < 3 && !connected; retry++) {
         try {
@@ -94,7 +88,6 @@ function startAreaSelection(card) {
 
       window.close();
     } catch (error) {
-      console.error('Failed to start selection:', error);
       resetButton(card);
     }
   })();
@@ -107,7 +100,6 @@ function startColorPicker(card) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) {
-        console.error('No active tab found');
         resetButton(card);
         return;
       }
@@ -121,7 +113,6 @@ function startColorPicker(card) {
       await new Promise(resolve => setTimeout(resolve, 100));
       window.close();
     } catch (error) {
-      console.error('Failed to start color picker:', error);
       resetButton(card);
     }
   })();
@@ -137,27 +128,21 @@ async function startFullPageCapture(card) {
       return;
     }
 
-    // Inject fullpage.js
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['fullpage.js']
     }).catch(e => {
-      if (!e.message.includes('already injected')) {
-        console.warn('Fullpage script injection:', e.message);
-      }
+      if (!e.message.includes('already injected')) {}
     });
 
-    // Small delay for script to load
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Trigger capture
     await chrome.tabs.sendMessage(tab.id, {
       action: 'START_FULL_PAGE_CAPTURE'
     });
 
     window.close();
   } catch (error) {
-    console.error('Full page capture failed:', error);
     resetButton(card);
   }
 }

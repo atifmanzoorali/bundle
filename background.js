@@ -1,16 +1,20 @@
 (function() {
   'use strict';
 
+  self.addEventListener('error', (event) => {
+    event.preventDefault();
+  });
+
+  self.addEventListener('unhandledrejection', (event) => {
+    event.preventDefault();
+  });
+
   const activePorts = new Map();
 
   chrome.runtime.onConnect.addListener((port) => {
-    console.log('[Background] Port connected:', port.name);
-
     activePorts.set(port.name, port);
 
     port.onMessage.addListener((message) => {
-      console.log('[Background] Port received:', message.action);
-
       if (message.action === 'CAPTURE_SELECTION') {
         captureViaOffscreen(message.coords, message.tabId, port)
           .then((result) => {
@@ -22,13 +26,11 @@
       }
 
       if (message.action === 'FULLPAGE_READY') {
-        console.log('[Background] Fullpage capture ready');
         port.postMessage({ action: 'BACKGROUND_READY' });
       }
     });
 
     port.onDisconnect.addListener(() => {
-      console.log('[Background] Port disconnected:', port.name);
       activePorts.delete(port.name);
     });
   });
@@ -36,16 +38,12 @@
   chrome.alarms.create('keep-alive', { periodInMinutes: 0.5 });
 
   chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'keep-alive') {
-      console.log('[Background] Keep-alive');
-    }
+    if (alarm.name === 'keep-alive') {}
   });
 
   let offscreenDocument = null;
 
   async function ensureOffscreenDocument() {
-    console.log('[Background] Checking for existing offscreen document');
-
     try {
       const existingContexts = await chrome.runtime.getContexts({
         contextTypes: ['OFFSCREEN_DOCUMENT'],
@@ -53,12 +51,9 @@
       });
 
       if (existingContexts.length > 0) {
-        console.log('[Background] Existing offscreen document found');
         offscreenDocument = existingContexts[0];
         return offscreenDocument;
       }
-
-      console.log('[Background] Creating new offscreen document');
 
       await chrome.offscreen.createDocument({
         url: 'offscreen.html',
@@ -74,30 +69,23 @@
       });
 
       offscreenDocument = contexts[0] || true;
-      console.log('[Background] Offscreen document created successfully');
       return offscreenDocument;
     } catch (error) {
-      console.error('[Background] Failed to create offscreen document:', error);
       throw error;
     }
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('[Background] Message received:', request.action);
-
     if (request.action === 'COLOR_PICKED') {
-      console.log('[Background] Color picked:', request.value);
       return true;
     }
 
     if (request.action === 'CAPTURE_SELECTION') {
       captureViaOffscreen(request.coords, request.tabId)
         .then((result) => {
-          console.log('[Background] Capture result:', result);
           sendResponse(result);
         })
         .catch((error) => {
-          console.error('[Background] Capture error:', error);
           sendResponse({ success: false, error: error.message });
         });
       return true;
@@ -111,14 +99,11 @@
     }
 
     if (request.action === 'STITCH_FULL_PAGE') {
-      console.log('[Background] Received STITCH_FULL_PAGE request');
       stitchFullPageViaOffscreen(request.chunks, request.dimensions)
         .then((result) => {
-          console.log('[Background] Stitch result:', result);
           sendResponse(result);
         })
         .catch((error) => {
-          console.error('[Background] Stitch error:', error);
           sendResponse({ success: false, error: error.message });
         });
       return true;
@@ -132,55 +117,38 @@
     }
 
     if (request.action === 'DOWNLOAD_BLOB') {
-      console.log('[Background] Downloading blob:', request.filename);
-
       try {
         chrome.downloads.download({
           url: request.url,
           filename: request.filename,
           saveAs: true
         }, (id) => {
-          if (chrome.runtime.lastError) {
-            console.error('[Background] DOWNLOAD ERROR:', chrome.runtime.lastError.message);
-          } else {
-            console.log('[Background] Download started, ID:', id);
-          }
-
+          if (chrome.runtime.lastError) {}
           setTimeout(() => {
-            console.log('[Background] Closing offscreen document');
             chrome.offscreen.closeDocument().catch(() => {});
           }, 1000);
         });
-      } catch (error) {
-        console.error('[Background] Download system error:', error);
-      }
-
+      } catch (error) {}
       return true;
     }
 
     if (request.action === 'STITCH_DONE') {
-      console.log('[Background] Download started:', request.filename, 'ID:', request.downloadId);
       return true;
     }
 
     if (request.action === 'STITCH_MEMORY_ERROR') {
-      console.error('[Background] Memory error:', request.error);
       return true;
     }
   });
 
   async function captureViaOffscreen(coords, tabId, port) {
-    console.log('[Background] Starting capture with coords:', coords, 'tabId:', tabId);
-
     try {
       let targetTabId = tabId;
 
       if (targetTabId) {
         try {
           const tab = await chrome.tabs.get(targetTabId);
-          console.log('[Background] Tab validated:', tab.id, tab.title);
         } catch (e) {
-          console.log('[Background] Tab no longer exists, finding current active tab');
           targetTabId = null;
         }
       }
@@ -191,12 +159,9 @@
           throw new Error('No active tab found');
         }
         targetTabId = tab.id;
-        console.log('[Background] Using current active tab:', targetTabId);
       }
 
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      console.log('[Background] Capturing tab:', targetTabId);
 
       const tab = await chrome.tabs.get(targetTabId);
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
@@ -205,15 +170,12 @@
       });
 
       if (chrome.runtime.lastError) {
-        console.error('[Background] CaptureVisibleTab error:', chrome.runtime.lastError.message);
         throw new Error(chrome.runtime.lastError.message);
       }
 
       if (!dataUrl) {
         throw new Error('Unable to capture - tab may be restricted or not loaded');
       }
-
-      console.log('[Background] Screenshot captured, size:', dataUrl.length);
 
       await ensureOffscreenDocument();
 
@@ -226,23 +188,18 @@
         });
       } catch (error) {
         if (error.message.includes('Receiving end does not exist')) {
-          console.error('[Background] Offscreen document closed unexpectedly');
           throw new Error('Processing context lost. Please try again.');
         }
         throw error;
       }
 
-      console.log('[Background] Offscreen crop response:', response);
-
       if (!response || !response.success) {
         throw new Error(response?.error || 'Cropping failed in offscreen');
       }
 
-      console.log('[Background] Crop initiated successfully');
       return { success: true };
 
     } catch (error) {
-      console.error('[Background] captureViaOffscreen error:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -265,27 +222,18 @@
 
       return { success: true, dataUrl };
     } catch (error) {
-      console.error('[Background] Capture chunk error:', error.message);
       return { success: false, error: error.message };
     }
   }
 
   async function stitchFullPageViaOffscreen(chunks, dimensions) {
-    console.log('[Background] Starting offscreen stitch');
-    console.log('[Background] Chunks:', chunks.length);
-    console.log('[Background] Dimensions:', dimensions);
-
     const MAX_HEIGHT = 16000;
     if (dimensions.height > MAX_HEIGHT) {
-      console.error('[Background] Image too tall:', dimensions.height);
       return { success: false, error: 'Image too tall (' + dimensions.height + 'px). Maximum is ' + MAX_HEIGHT + 'px.' };
     }
 
     try {
       await ensureOffscreenDocument();
-      console.log('[Background] Offscreen document ready');
-
-      console.log('[Background] Sending chunks to offscreen for stitching');
 
       let response;
       try {
@@ -296,23 +244,18 @@
         });
       } catch (error) {
         if (error.message.includes('Receiving end does not exist')) {
-          console.error('[Background] Offscreen document closed unexpectedly');
           throw new Error('Processing context lost. Please try again.');
         }
         throw error;
       }
 
-      console.log('[Background] Offscreen response:', response);
-
       if (!response || !response.success) {
         throw new Error(response?.error || 'Stitching failed in offscreen');
       }
 
-      console.log('[Background] Stitch initiated - offscreen will handle download');
       return { success: true, stitchingComplete: true };
 
     } catch (error) {
-      console.error('[Background] Error:', error.message);
       return { success: false, error: error.message };
     }
   }

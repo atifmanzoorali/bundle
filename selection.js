@@ -19,25 +19,20 @@
         backgroundPort = chrome.runtime.connect({ name: 'selection-port' });
 
         backgroundPort.onMessage.addListener((message) => {
-          console.log('Received from background:', message);
-
           if (message.action === 'CAPTURE_SELECTION_RESPONSE') {
             handleCaptureResponse(message.response);
           }
         });
 
         backgroundPort.onDisconnect.addListener(() => {
-          console.log('Background port disconnected');
           backgroundPort = null;
           portReady = false;
         });
 
-        // Port is ready immediately on successful connect()
         portReady = true;
         resolve(true);
 
       } catch (e) {
-        console.error('Failed to connect to background:', e.message);
         resolve(false);
       }
     });
@@ -47,15 +42,12 @@
     if (backgroundPort && portReady) {
       return true;
     }
-    
-    console.log('Ensuring port connection...');
     return await connectToBackground();
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'INIT_SELECTION') {
       currentTabId = request.tabId;
-      console.log('Stored tab ID:', currentTabId);
       ensurePortConnection().then(() => {
         init();
         sendResponse({ success: true });
@@ -217,32 +209,24 @@
     }
   }
 
-async function captureSelection() {
-  const rect = getSelectionRect();
-  const dpr = window.devicePixelRatio || 1;
+  async function captureSelection() {
+    const rect = getSelectionRect();
+    const dpr = window.devicePixelRatio || 1;
 
-  const cropArea = {
-    x: rect.startX * dpr,
-    y: rect.startY * dpr,
-    w: rect.width * dpr,
-    h: rect.height * dpr
-  };
+    const cropArea = {
+      x: rect.startX * dpr,
+      y: rect.startY * dpr,
+      w: rect.width * dpr,
+      h: rect.height * dpr
+    };
 
-  console.log('Attempting to capture with coords:', cropArea);
+    hideOverlayForCapture();
 
-  hideOverlayForCapture();
-
-  // Try multiple times with delays to wake up service worker
-  const maxRetries = 3;
+    const maxRetries = 3;
     let success = false;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`Capture attempt ${attempt} of ${maxRetries}`);
-      
-      // Try to ensure connection
       await ensurePortConnection();
-      
-      // Wait for service worker to potentially wake up
       await new Promise(resolve => setTimeout(resolve, 300 * attempt));
 
       if (backgroundPort && portReady) {
@@ -254,12 +238,8 @@ async function captureSelection() {
           });
           success = true;
           break;
-        } catch (e) {
-          console.error('Port post error:', e.message);
-        }
+        } catch (e) {}
       } else {
-        // Try sendMessage as fallback
-        console.log('Port not ready, trying sendMessage fallback');
         await sendMessageFallback(cropArea);
         success = true;
         break;
@@ -267,7 +247,6 @@ async function captureSelection() {
     }
 
     if (!success) {
-      console.error('All capture attempts failed');
       resetCaptureButton();
     }
   }
@@ -280,7 +259,6 @@ async function captureSelection() {
         tabId: currentTabId
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('sendMessage fallback failed:', chrome.runtime.lastError.message);
           handleCaptureResponse({ success: false, error: chrome.runtime.lastError.message });
         } else {
           handleCaptureResponse(response);
@@ -291,12 +269,9 @@ async function captureSelection() {
   }
 
   function handleCaptureResponse(response) {
-    console.log('Capture response:', response);
-    
     if (response?.success) {
       cleanup();
     } else {
-      console.error('Capture failed:', response?.error);
       resetCaptureButton();
     }
   }

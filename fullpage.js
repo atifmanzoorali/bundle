@@ -8,7 +8,6 @@
 
   async function startFullPageCapture() {
     if (isCapturing) {
-      console.log('[Fullpage] Capture already in progress');
       return;
     }
 
@@ -46,30 +45,23 @@
     ].join('');
     document.body.appendChild(overlay);
 
-    // IMMEDIATELY hide overlay before any captures - THIS IS CRITICAL
     overlay.style.display = 'none';
 
-    // Also hide any other extension UI elements
     document.querySelectorAll('[data-tool]').forEach(function(el) {
       el.style.display = 'none';
     });
 
-    // Wait for browser render cycle to complete before capturing
     await new Promise(function(resolve) {
       setTimeout(resolve, 150);
     });
 
     try {
-      // Open port to background for keep-alive
-      console.log('[Fullpage] Opening port to background');
       backgroundPort = chrome.runtime.connect({ name: 'fullpage-keepalive' });
 
       backgroundPort.onDisconnect.addListener(function() {
-        console.log('[Fullpage] Port disconnected');
         backgroundPort = null;
       });
 
-      // Wait for port to be ready
       await new Promise(function(resolve) {
         setTimeout(resolve, 100);
         resolve();
@@ -77,8 +69,6 @@
 
       const numChunks = Math.ceil(totalScrollHeight / viewportHeight);
       const chunks = [];
-
-      console.log('[Fullpage] Will capture', numChunks, 'chunks');
 
       for (var i = 0; i < numChunks; i++) {
         window.scrollTo(0, i * viewportHeight);
@@ -93,25 +83,17 @@
           var chunk = await captureChunk(i);
           if (chunk && chunk.dataUrl) {
             chunks.push({ index: i, dataUrl: chunk.dataUrl });
-            console.log('[Fullpage] Captured chunk', i, 'of', numChunks);
           }
-        } catch (e) {
-          console.error('[Fullpage] Failed to capture chunk', i, e);
-        }
+        } catch (e) {}
 
-        // Additional delay after capture to prevent throttling
         await sleep(100);
       }
 
       if (chunks.length > 0) {
-        // Show overlay again during stitching
         overlay.style.display = 'flex';
         var progressEl2 = document.getElementById('bundle-capture-progress');
         if (progressEl2) progressEl2.textContent = 'Processing...';
 
-        console.log('[Fullpage] All chunks captured, sending to background for stitching');
-        
-        // Use sendMessage with callback to ensure it's processed
         await new Promise(function(resolve, reject) {
           chrome.runtime.sendMessage({
             action: 'STITCH_FULL_PAGE',
@@ -123,27 +105,19 @@
             }
           }, function(response) {
             if (chrome.runtime.lastError) {
-              console.error('[Fullpage] Stitch failed:', chrome.runtime.lastError.message);
               reject(new Error(chrome.runtime.lastError.message));
             } else if (response && !response.success) {
-              console.error('[Fullpage] Stitch error:', response.error);
               reject(new Error(response.error));
             } else {
-              console.log('[Fullpage] Stitch complete');
               resolve(response);
             }
           });
         });
-        
-        console.log('[Fullpage] Capture complete!');
-      } else {
-        console.error('[Fullpage] No chunks captured');
       }
 
-    } catch (error) {
-      console.error('[Fullpage] Capture error:', error);
-    } finally {
-      // Cleanup
+    } catch (error) {}
+
+    finally {
       if (backgroundPort) {
         backgroundPort.disconnect();
         backgroundPort = null;
@@ -153,12 +127,10 @@
       document.documentElement.style.scrollBehavior = originalScrollBehavior;
       restoreFixedElements(hiddenElements);
 
-      // Remove overlay
       if (overlay && overlay.parentNode) {
         overlay.remove();
       }
 
-      // Restore any extension UI elements we hid
       document.querySelectorAll('[data-tool]').forEach(function(el) {
         el.style.display = '';
       });
@@ -211,19 +183,15 @@
   if (chrome && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       if (request.action === 'START_FULL_PAGE_CAPTURE') {
-        console.log('[Fullpage] Received START_FULL_PAGE_CAPTURE');
         startFullPageCapture()
           .then(function() {
             sendResponse({ success: true });
           })
           .catch(function(error) {
-            console.error('[Fullpage] Error:', error);
             sendResponse({ success: false, error: error.message });
           });
         return true;
       }
     });
   }
-
-  console.log('[Fullpage] Script loaded and ready');
 })();

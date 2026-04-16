@@ -5,8 +5,6 @@
   const MAX_WIDTH = 10000;
   const JPEG_THRESHOLD = 10000;
 
-  console.log('[Offscreen] Offscreen Document Created');
-
   function validateDimensions(dimensions) {
     if (dimensions.height > MAX_HEIGHT) {
       return { valid: false, error: 'Image too tall (' + dimensions.height + 'px). Maximum is ' + MAX_HEIGHT + 'px.' };
@@ -18,15 +16,10 @@
   }
 
   async function cropAndDownload(dataUrl, coords) {
-    console.log('[Offscreen] CROP_AND_DOWNLOAD - Processing crop request');
-    console.log('[Offscreen] Coords:', coords);
-
     try {
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       const img = await createImageBitmap(blob);
-
-      console.log('[Offscreen] Full screenshot loaded:', img.width, 'x', img.height);
 
       const canvas = document.getElementById('stitch-canvas');
       canvas.width = coords.w;
@@ -35,8 +28,6 @@
 
       ctx.drawImage(img, coords.x, coords.y, coords.w, coords.h, 0, 0, coords.w, coords.h);
       img.close();
-
-      console.log('[Offscreen] Crop drawn to canvas:', coords.w, 'x', coords.h);
 
       const croppedBlob = await new Promise(function(resolve, reject) {
         try {
@@ -52,8 +43,6 @@
         }
       });
 
-      console.log('[Offscreen] Cropped blob created, size:', croppedBlob.size, 'bytes');
-
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = 'screenshot-' + timestamp + '.png';
 
@@ -61,7 +50,6 @@
       return { success: true };
 
     } catch (error) {
-      console.error('[Offscreen] CROP_AND_DOWNLOAD error:', error.message);
       throw error;
     }
   }
@@ -78,12 +66,8 @@
     canvas.width = dimensions.width;
     canvas.height = dimensions.height;
 
-    console.log('[Offscreen] Canvas created:', dimensions.width, 'x', dimensions.height);
-    console.log('[Offscreen] Stitching Started - processing', chunks.length, 'chunks');
-
     for (var i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log('[Offscreen] Processing chunk', i + 1, 'of', chunks.length);
 
       try {
         const response = await fetch(chunk.dataUrl);
@@ -95,18 +79,13 @@
 
         img.close();
       } catch (chunkError) {
-        console.error('[Offscreen] Error processing chunk', i, chunkError.message);
         throw new Error('Failed to process chunk ' + i + ': ' + chunkError.message);
       }
     }
 
-    console.log('[Offscreen] All chunks drawn, converting to blob');
-
     const useJpeg = dimensions.height > JPEG_THRESHOLD;
     const format = useJpeg ? 'image/jpeg' : 'image/png';
     const quality = useJpeg ? 0.8 : undefined;
-
-    console.log('[Offscreen] Using format:', format, useJpeg ? '(0.8 quality for large image)' : '(PNG)');
 
     const finalBlob = await new Promise(function(resolve, reject) {
       try {
@@ -122,14 +101,11 @@
       }
     });
 
-    console.log('[Offscreen] Blob created, size:', finalBlob.size, 'bytes');
     return finalBlob;
   }
 
   function triggerDownload(blob, filename) {
     const blobUrl = URL.createObjectURL(blob);
-    console.log('[Offscreen] Blob URL created:', blobUrl);
-    console.log('[Offscreen] Sending blob URL to background for download');
 
     chrome.runtime.sendMessage({
       action: 'DOWNLOAD_BLOB',
@@ -139,15 +115,12 @@
   }
 
   chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    console.log('[Offscreen] Received message:', request.action);
-
     if (request.action === 'CROP_AND_DOWNLOAD') {
       cropAndDownload(request.dataUrl, request.coords)
         .then(function(result) {
           sendResponse(result);
         })
         .catch(function(error) {
-          console.error('[Offscreen] CROP_AND_DOWNLOAD failed:', error.message);
           sendResponse({ success: false, error: error.message });
         });
       return true;
@@ -164,14 +137,11 @@
           const ext = useJpeg ? 'jpg' : 'png';
           const filename = 'full-page-' + timestamp + '.' + ext;
 
-          console.log('[Offscreen] Triggering download:', filename);
           triggerDownload(blob, filename);
 
           sendResponse({ success: true, stitchingComplete: true });
         })
         .catch(function(error) {
-          console.error('[Offscreen] STITCH_AND_DOWNLOAD failed:', error.message);
-
           const memoryErrorPatterns = [
             'memory',
             'allocation',
@@ -186,7 +156,6 @@
           });
 
           if (isMemoryError) {
-            console.error('[Offscreen] Memory error detected - image too large');
             chrome.runtime.sendMessage({
               action: 'STITCH_MEMORY_ERROR',
               error: error.message
@@ -205,11 +174,8 @@
     }
 
     if (request.action === 'CLOSE_OFFSCREEN') {
-      console.log('[Offscreen] Received close command - exiting');
       sendResponse({ success: true });
       return;
     }
   });
-
-  console.log('[Offscreen] Ready and listening for messages');
 })();

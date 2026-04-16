@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bundle",
+  "name": "Bundle - All-in-One Design Utility",
   "version": "1.0.0",
-  "description": "All-in-one Chrome extension: Screenshot, Full Page Capture, and Color Picker",
+  "description": "Full page screenshot, screen capture, area selection, and color picker. Capture any visible area, scroll to capture entire pages, pick colors from any website. The minimalist design utility for designers and developers.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
