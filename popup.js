@@ -112,11 +112,13 @@ function startColorPicker(card) {
         return;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      chrome.tabs.sendMessage(tab.id, { action: 'OPEN_PICKER' }, () => {
-        window.close();
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['colorPicker.js'],
+        world: 'MAIN'
       });
+
+      window.close();
     } catch (error) {
       console.error('Failed to start color picker:', error);
       resetButton(card);
